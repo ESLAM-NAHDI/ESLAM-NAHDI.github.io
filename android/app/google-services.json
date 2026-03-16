@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "684415395438",
+    "project_id": "nahdi-man",
+    "storage_bucket": "nahdi-man.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:684415395438:android:f8ffe72d2486529853287f",
+        "android_client_info": {
+          "package_name": "com.example.nahdi_api_dashboard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDN4I_DVsy4x5YmxhTU6mRdVLJKWPfZmPc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,47 @@
+---
+description: Look up APIs from the club (nahdi-mobile) project and add them to the API dashboard
+alwaysApply: true
+---
+
+# Club Project API Lookup
+
+When the user asks about APIs, curl commands, requests, or "what happens in [screen name]" for any screen:
+
+## 1. Source of Truth: Club Project (nahdi-mobile)
+
+The **club project** is nahdi-mobile at:
+```
+/Users/eslamwaheedrafat/StudioProjects/nahdi-mobile
+```
+
+## 2. Where to Find API Info
+
+- **Endpoints**: `lib/features/<feature>/data/endpoints/` or `*_endpoints.dart`
+- **Datasources**: `lib/features/<feature>/data/datasource/` or `*_datasource_impl.dart` (shows how APIs are called)
+- **Base URL**: `https://b12.nahdionline.com/` (main API) or `https://sso.nahdionline.com/` (auth)
+- **Common headers**: `client_id`, `locale=en-SA`, `device=app`, `Accept`, `Content-Type`
+
+## 3. Key Feature Paths (Club Project)
+
+| Screen/Feature | Endpoints File |
+|----------------|----------------|
+| Splash | `lib/features/splash/data/endpoints/splash_url_endpoints.dart` |
+| Mama Club | `lib/features/mama_club/data/mama_club_endpoints.dart` |
+| Login/Auth | `lib/features/auth/presentation/data/auth_endpoints.dart` |
+| Home | `lib/features/main/home/data/endpoints/home_endpoints.dart` |
+| Cart | `lib/features/cart/data/cart_endpoints.dart` |
+| Checkout | `lib/features/checkout/data/checkout_endpoints.dart` |
+| Orders | `lib/features/order/data/order_endpoints.dart` |
+
+## 4. Adding to the Dashboard
+
+- **APIs with curl**: Add to `lib/data/api_data.dart` as `PageInfo` / `ApiInfo`
+- **Screen docs**: Add to `lib/screens_documentation/data/screens_data.dart` as `ScreenInfoModel`
+- **Curl format**: `curl -X METHOD "https://b12.nahdionline.com/ENDPOINT?locale=en-SA&device=app" -H "accept: application/json" -H "Content-Type: application/json" -H "client_id: dddc5530-fbc5-4a30-bf63-3d3d7f63de6b" -L -k`
+
+## 5. Workflow
+
+1. User asks: "What APIs does the splash screen call?" or "Get me the curl for Mama Club"
+2. Search/look at nahdi-mobile at the relevant feature path
+3. Extract endpoint, method, description from datasource/endpoints
+4. Provide the info and optionally add it to `lib/data/api_data.dart`

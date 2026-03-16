@@ -1,0 +1,44 @@
+name: nahdi_api_dashboard
+description: "A new Flutter project."
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.2
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  url_launcher: ^6.2.5
+  pluto_grid: ^8.0.0
+  http: ^1.2.0
+  flutter_svg: ^2.0.10+1
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.3
+  freezed_annotation: ^2.4.1
+  collection: ^1.18.0
+  shared_preferences: ^2.2.2
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.1
+  cloud_firestore: ^5.4.4
+  firebase_storage: ^12.3.2
+  image_picker: ^1.1.2
+  cached_network_image: ^3.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.8
+  riverpod_generator: ^2.3.9
+  freezed: ^2.4.7
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/ic_nahdi.svg
+    - assets/screenshots/
+    - assets/screenshots/splash.png
+    - assets/screenshots/onboarding.png
+    - assets/screenshots/login.png
+    - assets/screenshots/checkout.png
+    - assets/screenshots/product-detail.png
