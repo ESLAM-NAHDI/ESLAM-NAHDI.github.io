@@ -264,11 +264,10 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
         
         if (selectedMethod == 'GET') {
           // Try multiple proxy services for GET requests
-          // Option 1: allorigins (most reliable)
-          requestUrl = 'https://api.allorigins.win/get?url=$encodedUrl';
+          requestUrl = 'https://api.allorigins.win/raw?url=$encodedUrl';
         } else {
-          // For POST/PUT/PATCH/DELETE, use corsproxy.io
-          requestUrl = 'https://corsproxy.io/?$encodedUrl';
+          // For POST/PUT/PATCH/DELETE: use cors.lol (works in production, unlike corsproxy.io)
+          requestUrl = 'https://api.cors.lol/?url=$encodedUrl';
         }
         
         // Debug: Log that we're using proxy
@@ -285,17 +284,16 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
       if (shouldUseProxy && originalUrl != null) {
         final encodedUrl = Uri.encodeComponent(originalUrl);
         if (selectedMethod == 'GET') {
-          // Try fastest proxy first, then fallback to others if it fails
+          // Proxies that work in production (corsproxy.io blocks non-localhost)
           proxyAttempts = [
-            'https://api.allorigins.win/raw?url=$encodedUrl', // Fastest proxy endpoint
-            'https://api.allorigins.win/get?url=$encodedUrl', // Fallback 1
-            'https://corsproxy.io/?$encodedUrl', // Fallback 2
+            'https://api.allorigins.win/raw?url=$encodedUrl',
+            'https://api.cors.lol/?url=$encodedUrl',
+            'https://api.allorigins.win/get?url=$encodedUrl',
           ];
         } else {
-          // For non-GET requests, use corsproxy.io (supports POST/PUT/DELETE)
+          // For POST/PUT/DELETE: only cors.lol supports POST with body; allorigins does not
           proxyAttempts = [
-            'https://corsproxy.io/?$encodedUrl',
-            'https://api.allorigins.win/get?url=$encodedUrl', // Fallback
+            'https://api.cors.lol/?url=$encodedUrl',
           ];
         }
       }
