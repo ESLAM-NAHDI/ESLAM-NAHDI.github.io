@@ -16,7 +16,29 @@ class ApiInfo {
     this.method = 'GET',
     this.curl,
   });
+
+  ApiInfo copyWith({
+    String? url,
+    String? body,
+    String? description,
+    int? numberOfCalls,
+    String? postmanLink,
+    String? method,
+    Object? curl = _undefined,
+  }) {
+    return ApiInfo(
+      url: url ?? this.url,
+      body: body ?? this.body,
+      description: description ?? this.description,
+      numberOfCalls: numberOfCalls ?? this.numberOfCalls,
+      postmanLink: postmanLink ?? this.postmanLink,
+      method: method ?? this.method,
+      curl: curl == _undefined ? this.curl : curl as String?,
+    );
+  }
 }
+
+const _undefined = Object();
 
 class PageInfo {
   final String? id; // Firestore document ID

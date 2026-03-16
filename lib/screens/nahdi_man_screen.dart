@@ -20,6 +20,10 @@ class NahdiManScreen extends ConsumerStatefulWidget {
   final String? initialMethod;
   final String? initialUrl;
   final String? initialBody;
+  /// When true, shows an "Update to Firebase" button that builds cURL from current state and calls [onUpdateToFirebase].
+  final bool showUpdateToFirebaseButton;
+  /// Callback when user taps "Update to Firebase". Receives the current request as a cURL string.
+  final Future<void> Function(String curl)? onUpdateToFirebase;
 
   const NahdiManScreen({
     super.key,
@@ -27,6 +31,8 @@ class NahdiManScreen extends ConsumerStatefulWidget {
     this.initialMethod,
     this.initialUrl,
     this.initialBody,
+    this.showUpdateToFirebaseButton = false,
+    this.onUpdateToFirebase,
   });
 
   @override
@@ -56,9 +62,9 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
     
     // Initialize with provided values
     if (widget.initialCurl != null && widget.initialCurl!.isNotEmpty) {
-      // Parse curl command
+      // Parse curl command silently (no toast when navigating from View)
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _parseCurl(widget.initialCurl!);
+        _parseCurl(widget.initialCurl!, showSuccessToast: false);
       });
         } else {
           // Set initial values directly - delay provider modification
@@ -918,7 +924,44 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
     }
   }
 
-  void _parseCurl(String curlCommand) {
+  /// Builds a cURL command string from the current request state (method, URL, headers, body, query params).
+  String _buildCurlFromCurrentState() {
+    final method = ref.read(selectedMethodProvider);
+    String url = _urlController.text.trim();
+    if (url.isEmpty) return '';
+    // Append query params to URL
+    final effectiveParams = _queryParams
+        .where((e) => e.key.trim().isNotEmpty && e.value.trim().isNotEmpty)
+        .map((e) => MapEntry(e.key.trim(), e.value.trim()));
+    if (effectiveParams.isNotEmpty) {
+      final uri = Uri.tryParse(url);
+      if (uri != null) {
+        final updated = uri.replace(queryParameters: {
+          ...uri.queryParameters,
+          for (final e in effectiveParams) e.key: e.value,
+        });
+        url = updated.toString();
+      }
+    }
+    final sb = StringBuffer('curl -X $method ');
+    sb.write("'$url'");
+    // Authorization from token
+    if (_tokenController.text.trim().isNotEmpty) {
+      sb.write(" -H 'Authorization: Bearer ${_tokenController.text.trim()}'");
+    }
+    for (final h in _headers) {
+      if (h.key.trim().isNotEmpty && h.value.trim().isNotEmpty) {
+        sb.write(" -H '${h.key.trim()}: ${h.value.trim().replaceAll("'", "'\\''")}'");
+      }
+    }
+    if (['POST', 'PUT', 'PATCH'].contains(method) && _bodyController.text.trim().isNotEmpty) {
+      final body = _bodyController.text.trim().replaceAll("'", "'\\''");
+      sb.write(" --data-raw '$body'");
+    }
+    return sb.toString();
+  }
+
+  void _parseCurl(String curlCommand, {bool showSuccessToast = true}) {
     _isParsingCurl = true;
     try {
       String method = 'GET';
@@ -1078,13 +1121,15 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
       _queryParams.clear();
       _queryParams.addAll(queryParams.entries.map((e) => MapEntry(e.key, e.value)));
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Center(child: Text('cURL command imported successfully!', style: const TextStyle(color: Colors.white))),
-          backgroundColor: Color(0xFF10B981),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      if (showSuccessToast) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Center(child: Text('cURL command imported successfully!', style: TextStyle(color: Colors.white))),
+            backgroundColor: Color(0xFF10B981),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1109,6 +1154,47 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
       appBar: AppBar(
         backgroundColor: const Color(0xFF2D2D2D),
         elevation: 0,
+        actions: [
+          if (widget.showUpdateToFirebaseButton && widget.onUpdateToFirebase != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ElevatedButton.icon(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        final curl = _buildCurlFromCurrentState();
+                        if (curl.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter a URL first'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
+                        try {
+                          await widget.onUpdateToFirebase!(curl);
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Failed to update: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                icon: const Icon(Icons.cloud_upload, size: 18),
+                label: const Text('Update to Firebase'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF3B82F6),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+              ),
+            ),
+        ],
         title: Row(
           children: [
             Container(

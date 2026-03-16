@@ -4,16 +4,20 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/api_info.dart';
 import '../providers/app_providers.dart';
+import '../providers/firestore_providers.dart';
+import '../services/firestore_service.dart';
 import 'nahdi_man_screen.dart';
 
 class ApiDetailPage extends ConsumerStatefulWidget {
   final ApiInfo api;
   final String pageName;
+  final PageInfo? pageInfo;
 
   const ApiDetailPage({
     super.key,
     required this.api,
     required this.pageName,
+    this.pageInfo,
   });
 
   @override
@@ -43,6 +47,56 @@ class _ApiDetailPageState extends ConsumerState<ApiDetailPage> {
     final uri = Uri.parse(url);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _updateCurlToFirebase(String curl) async {
+    final pageInfo = widget.pageInfo;
+    if (pageInfo == null || pageInfo.id == null) return;
+
+    try {
+      // Find and update the matching API (by url + method)
+      final updatedApis = pageInfo.apis.map((api) {
+        if (api.url == widget.api.url && api.method == widget.api.method) {
+          return api.copyWith(curl: curl);
+        }
+        return api;
+      }).toList();
+
+      final updatedPage = PageInfo(
+        id: pageInfo.id,
+        name: pageInfo.name,
+        apis: updatedApis,
+        screenshot: pageInfo.screenshot,
+      );
+
+      final firestore = ref.read(firestoreServiceProvider);
+      await firestore.addOrUpdatePage(updatedPage);
+
+      ref.invalidate(pagesProvider);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Center(
+              child: Text(
+                'cURL updated in Firebase successfully!',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+            backgroundColor: Color(0xFF10B981),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -347,6 +401,8 @@ class _ApiDetailPageState extends ConsumerState<ApiDetailPage> {
                   initialMethod: widget.api.method,
                   initialUrl: widget.api.url,
                   initialBody: widget.api.body,
+                  showUpdateToFirebaseButton: widget.pageInfo?.id != null,
+                  onUpdateToFirebase: widget.pageInfo?.id != null ? _updateCurlToFirebase : null,
                 ),
               ),
             ),

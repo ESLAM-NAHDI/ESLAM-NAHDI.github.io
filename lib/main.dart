@@ -11,6 +11,7 @@ import 'screens/nahdi_man_screen.dart';
 import 'screens/admin_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/developer_notes_screen.dart';
+import 'screens/developer_links_screen.dart';
 import 'screens/migration_screen.dart';
 import 'screens_documentation/presentation/widgets/screen_details_widget.dart';
 // Static data import commented out - using Firestore only
@@ -380,6 +381,43 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (context) => const DeveloperNotesScreen(),
+                            ),
+                          );
+                        },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 4,
+                        ),
+                      ),
+                      // Developer Links
+                      if (user.hasPermission(PermissionKeys.developerNotes))
+                      ListTile(
+                        leading: const SizedBox(width: 40),
+                        title: Row(
+                          children: [
+                            Icon(
+                              Icons.link,
+                              size: 18,
+                              color: theme.colorScheme.onSurface.withOpacity(0.8),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Links',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: theme.colorScheme.onSurface.withOpacity(0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap: () {
+                          _scaffoldKey.currentState?.closeDrawer();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const DeveloperLinksScreen(),
                             ),
                           );
                         },

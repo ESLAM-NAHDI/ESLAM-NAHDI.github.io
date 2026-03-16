@@ -42,16 +42,23 @@ final pagesProvider = FutureProvider<List<PageInfo>>((ref) async {
     }
     return null;
   }
-  // Prefer ApiData APIs when a matching page exists (source of truth in code)
+  // Prefer Firestore APIs when page exists in Firestore (user can update cURL etc.)
+  // Only use static ApiData for pages not yet migrated to Firestore
   List<ApiInfo> _getApisForPage(PageInfo firestorePage) {
+    // If we have Firestore data (page has id), use it - user updates must be preserved
+    if (firestorePage.id != null &&
+        firestorePage.id!.isNotEmpty &&
+        firestorePage.apis.isNotEmpty) {
+      return firestorePage.apis;
+    }
+    // Fallback to static ApiData for pages without Firestore APIs (not yet migrated)
     final key = firestorePage.name.toLowerCase();
     var staticPage = staticPageMap[key];
-    // Fallback: Firestore may have "Cart Screen" etc. - match by prefix for known pages
     if (staticPage == null && key.contains('cart')) {
       staticPage = staticPageMap['cart'];
     }
     if (staticPage != null && staticPage.apis.isNotEmpty) {
-      return staticPage.apis; // Use ApiData APIs (includes Bazaar Voice, etc.)
+      return staticPage.apis;
     }
     return firestorePage.apis;
   }

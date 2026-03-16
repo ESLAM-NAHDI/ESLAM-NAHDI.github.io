@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 
@@ -13,6 +14,7 @@ class Note {
   final String content;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final String? createdBy;
 
   Note({
     required this.id,
@@ -20,6 +22,7 @@ class Note {
     required this.content,
     required this.createdAt,
     this.updatedAt,
+    this.createdBy,
   });
 
   Map<String, dynamic> toJson() {
@@ -29,6 +32,7 @@ class Note {
       'content': content,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
+      'createdBy': createdBy,
     };
   }
 
@@ -39,6 +43,7 @@ class Note {
       content: json['content'],
       createdAt: DateTime.parse(json['createdAt']),
       updatedAt: json['updatedAt'] != null ? DateTime.parse(json['updatedAt']) : null,
+      createdBy: json['createdBy'] as String?,
     );
   }
 }
@@ -74,12 +79,13 @@ class DeveloperNotesNotifier extends StateNotifier<List<Note>> {
     }
   }
 
-  Future<void> addNote(String title, String content) async {
+  Future<void> addNote(String title, String content, {String? createdBy}) async {
     final note = Note(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: title,
       content: content,
       createdAt: DateTime.now(),
+      createdBy: createdBy,
     );
     state = [note, ...state];
     await _saveNotes();
@@ -94,6 +100,7 @@ class DeveloperNotesNotifier extends StateNotifier<List<Note>> {
           content: content,
           createdAt: note.createdAt,
           updatedAt: DateTime.now(),
+          createdBy: note.createdBy,
         );
       }
       return note;
@@ -199,7 +206,7 @@ class _DeveloperNotesScreenState extends ConsumerState<DeveloperNotesScreen> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            _formatDate(note.createdAt, note.updatedAt),
+                            _formatNoteMeta(note),
                             style: TextStyle(
                               fontSize: 12,
                               color: theme.colorScheme.onSurface.withOpacity(0.5),
@@ -262,7 +269,8 @@ class _DeveloperNotesScreenState extends ConsumerState<DeveloperNotesScreen> {
               final content = contentController.text.trim();
               if (title.isNotEmpty && content.isNotEmpty) {
                 if (note == null) {
-                  ref.read(developerNotesProvider.notifier).addNote(title, content);
+                  final userName = FirebaseAuth.instance.currentUser?.email ?? 'Unknown';
+                  ref.read(developerNotesProvider.notifier).addNote(title, content, createdBy: userName);
                 } else {
                   ref.read(developerNotesProvider.notifier).updateNote(note.id, title, content);
                 }
@@ -301,6 +309,16 @@ class _DeveloperNotesScreenState extends ConsumerState<DeveloperNotesScreen> {
         ],
       ),
     );
+  }
+
+  String _formatNoteMeta(Note note) {
+    final userPart = (note.createdBy != null && note.createdBy!.isNotEmpty)
+        ? 'By ${note.createdBy}'
+        : 'By Unknown';
+    final datePart = note.updatedAt != null
+        ? 'Updated: ${_formatDateTime(note.updatedAt!)}'
+        : 'Created: ${_formatDateTime(note.createdAt)}';
+    return '$userPart • $datePart';
   }
 
   String _formatDate(DateTime createdAt, DateTime? updatedAt) {

@@ -105,11 +105,12 @@ class _ApiDashboardState extends ConsumerState<ApiDashboard> {
 
   PageInfo? get selectedPageInfo {
     final selectedPage = ref.read(selectedPageProvider);
-    if (selectedPage.isEmpty) return null;
-    return pages.firstWhere(
-      (page) => page.name == selectedPage,
-      orElse: () => pages.first,
-    );
+    if (selectedPage.isEmpty || pages.isEmpty) return null;
+    try {
+      return pages.firstWhere((page) => page.name == selectedPage);
+    } catch (_) {
+      return pages.first;
+    }
   }
 
   // Get pages that have at least one API with cURL, sorted in specific order
@@ -195,6 +196,7 @@ class _ApiDashboardState extends ConsumerState<ApiDashboard> {
     
     _isNavigating = true;
     final selectedPage = ref.read(selectedPageProvider);
+    final pageInfo = selectedPageInfo;
     
     Navigator.push(
       context,
@@ -202,12 +204,24 @@ class _ApiDashboardState extends ConsumerState<ApiDashboard> {
         builder: (context) => ApiDetailPage(
           api: api,
           pageName: selectedPage.isEmpty ? 'Unknown' : selectedPage,
+          pageInfo: pageInfo,
         ),
       ),
-    ).then((_) {
-      // Reset navigation flag when returning from detail page
+    ).then((_) async {
+      // Reset navigation flag and reload pages (user may have updated cURL in Firebase)
       if (mounted) {
         _isNavigating = false;
+        try {
+          ref.invalidate(pagesProvider);
+          final firestorePages = await ref.read(pagesProvider.future);
+          if (mounted) {
+            setState(() {
+              pages = firestorePages;
+              _isLoadingPages = false;
+            });
+            if (firestorePages.isNotEmpty) _initializeSelectedPage();
+          }
+        } catch (_) {}
       }
     });
   }

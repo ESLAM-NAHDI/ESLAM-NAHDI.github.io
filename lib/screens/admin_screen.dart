@@ -128,9 +128,7 @@ class _UserCardState extends ConsumerState<_UserCard> {
                     style: theme.textTheme.titleSmall,
                   ),
                   const SizedBox(height: 8),
-                  ...PermissionKeys.all
-                      .where((k) => k != PermissionKeys.admin)
-                      .map((key) => SwitchListTile(
+                  ...PermissionKeys.all.map((key) => SwitchListTile(
                             title: Text(PermissionKeys.label(key)),
                             value: user.permissions[key] ?? false,
                             onChanged: (v) => _updatePermission(user, key, v),
