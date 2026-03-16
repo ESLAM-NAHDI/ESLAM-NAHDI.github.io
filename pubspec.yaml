@@ -1,6 +1,6 @@
 name: nahdi_api_dashboard
 description: "A new Flutter project."
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: ^3.7.2
@@ -23,6 +23,7 @@ dependencies:
   firebase_storage: ^12.3.2
   image_picker: ^1.1.2
   cached_network_image: ^3.3.1
+  package_info_plus: ^8.0.0
 
 dev_dependencies:
   flutter_test:
