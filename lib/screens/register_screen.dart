@@ -3,111 +3,76 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'register_screen.dart';
 import 'email_verification_screen.dart';
-import 'pending_approval_screen.dart';
-import '../main.dart';
+import 'login_screen.dart';
+import '../models/app_user.dart';
 import '../services/user_service.dart';
 
-final isLoadingProvider = StateProvider<bool>((ref) => false);
-final obscurePasswordProvider = StateProvider<bool>((ref) => true);
+final isLoadingRegisterProvider = StateProvider<bool>((ref) => false);
+final obscurePasswordRegisterProvider = StateProvider<bool>((ref) => true);
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends ConsumerStatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
-    ref.read(isLoadingProvider.notifier).state = true;
+    ref.read(isLoadingRegisterProvider.notifier).state = true;
 
     try {
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
       if (credential.user != null) {
         final u = credential.user!;
-        if (u.emailVerified) {
-          final service = ref.read(userServiceProvider);
-          if (service.isDefaultAdmin(u.email)) {
-            if (mounted) {
-              ref.read(isLoadingProvider.notifier).state = false;
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const MainScreen()),
-              );
-            }
-          } else {
-            final appUser = await service.getUser(u.uid);
-            if (appUser?.isBlocked ?? false) {
-              if (mounted) {
-                ref.read(isLoadingProvider.notifier).state = false;
-                await FirebaseAuth.instance.signOut();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Center(
-                      child: Text('Your account has been blocked. Contact admin.', style: const TextStyle(color: Colors.white)),
-                    ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            } else if (appUser?.isApproved ?? false) {
-              if (mounted) {
-                ref.read(isLoadingProvider.notifier).state = false;
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const MainScreen()),
-                );
-              }
-            } else {
-              if (mounted) {
-                ref.read(isLoadingProvider.notifier).state = false;
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (_) => PendingApprovalScreen(email: u.email ?? ''),
-                  ),
-                );
-              }
-            }
-          }
-        } else {
-          if (mounted) {
-            ref.read(isLoadingProvider.notifier).state = false;
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(
-                builder: (_) => EmailVerificationScreen(
-                  email: credential.user!.email ?? _emailController.text.trim(),
-                ),
+        final service = ref.read(userServiceProvider);
+        final isAdmin = service.isDefaultAdmin(u.email);
+        await service.createOrUpdateUser(AppUser(
+          uid: u.uid,
+          email: u.email ?? _emailController.text.trim(),
+          status: isAdmin ? 'approved' : 'pending',
+          isAdmin: isAdmin,
+          permissions: isAdmin ? {for (final k in PermissionKeys.all) k: true} : {},
+          createdAt: DateTime.now(),
+        ));
+        await u.sendEmailVerification();
+
+        if (mounted) {
+          ref.read(isLoadingRegisterProvider.notifier).state = false;
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => EmailVerificationScreen(
+                email: _emailController.text.trim(),
               ),
-            );
-          }
+            ),
+          );
         }
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
-        ref.read(isLoadingProvider.notifier).state = false;
-        String message = 'Login failed';
+        ref.read(isLoadingRegisterProvider.notifier).state = false;
+        String message = 'Registration failed';
         switch (e.code) {
-          case 'user-not-found':
-            message = 'No account found with this email';
-            break;
-          case 'wrong-password':
-            message = 'Wrong password';
+          case 'email-already-in-use':
+            message = 'This email is already registered';
             break;
           case 'invalid-email':
             message = 'Invalid email address';
             break;
-          case 'invalid-credential':
-            message = 'Invalid email or password';
+          case 'weak-password':
+            message = 'Password is too weak (min 6 characters)';
             break;
         }
         ScaffoldMessenger.of(context).showSnackBar(
@@ -116,7 +81,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ref.read(isLoadingProvider.notifier).state = false;
+        ref.read(isLoadingRegisterProvider.notifier).state = false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Center(child: Text('Error: $e', style: const TextStyle(color: Colors.white))), backgroundColor: Colors.red),
         );
@@ -128,14 +93,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isLoading = ref.watch(isLoadingProvider);
-    final obscurePassword = ref.watch(obscurePasswordProvider);
+    final isLoading = ref.watch(isLoadingRegisterProvider);
+    final obscurePassword = ref.watch(obscurePasswordRegisterProvider);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -146,33 +112,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  margin: const EdgeInsets.only(bottom: 48),
-                  child: SvgPicture.asset(
-                    'assets/ic_nahdi.svg',
-                    width: 120,
-                    height: 120,
-                  ),
-                ),
+                SvgPicture.asset('assets/ic_nahdi.svg', width: 100, height: 100),
+                const SizedBox(height: 24),
                 Text(
-                  'Welcome Back',
+                  'Create Account',
                   style: TextStyle(
-                    fontSize: 32,
+                    fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onSurface,
                   ),
-                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sign in to continue',
+                  'Register to access the dashboard',
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 14,
                     color: theme.colorScheme.onSurface.withOpacity(0.7),
                   ),
-                  textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 48),
+                const SizedBox(height: 32),
                 Card(
                   elevation: 4,
                   shape: RoundedRectangleBorder(
@@ -184,7 +142,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: Form(
                       key: _formKey,
                       child: Column(
-                        mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           TextFormField(
@@ -201,11 +158,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ),
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your email';
-                              }
-                              if (!value.contains('@')) return 'Enter a valid email';
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Enter your email';
+                              if (!v.contains('@')) return 'Enter a valid email';
                               return null;
                             },
                           ),
@@ -215,7 +170,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             obscureText: obscurePassword,
                             decoration: InputDecoration(
                               labelText: 'Password',
-                              hintText: 'Enter your password',
+                              hintText: 'Min 6 characters',
                               prefixIcon: const Icon(Icons.lock_outline),
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -224,7 +179,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       : Icons.visibility_off_outlined,
                                 ),
                                 onPressed: () {
-                                  ref.read(obscurePasswordProvider.notifier).state =
+                                  ref.read(obscurePasswordRegisterProvider.notifier).state =
                                       !obscurePassword;
                                 },
                               ),
@@ -234,30 +189,44 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               filled: true,
                               fillColor: theme.colorScheme.surface.withOpacity(0.5),
                             ),
-                            textInputAction: TextInputAction.done,
-                            onFieldSubmitted: (_) => _handleLogin(),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'Please enter your password';
-                              }
-                              if (value.length < 6) {
-                                return 'Password must be at least 6 characters';
+                            validator: (v) {
+                              if (v == null || v.isEmpty) return 'Enter password';
+                              if (v.length < 6) return 'Password must be at least 6 characters';
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          TextFormField(
+                            controller: _confirmPasswordController,
+                            obscureText: obscurePassword,
+                            decoration: InputDecoration(
+                              labelText: 'Confirm Password',
+                              hintText: 'Re-enter password',
+                              prefixIcon: const Icon(Icons.lock_outline),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              filled: true,
+                              fillColor: theme.colorScheme.surface.withOpacity(0.5),
+                            ),
+                            validator: (v) {
+                              if (v != _passwordController.text) {
+                                return 'Passwords do not match';
                               }
                               return null;
                             },
                           ),
-                          const SizedBox(height: 32),
+                          const SizedBox(height: 28),
                           SizedBox(
-                            height: 56,
+                            height: 52,
                             child: ElevatedButton(
-                              onPressed: isLoading ? null : _handleLogin,
+                              onPressed: isLoading ? null : _handleRegister,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: theme.colorScheme.primary,
                                 foregroundColor: Colors.white,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
-                                elevation: 2,
                               ),
                               child: isLoading
                                   ? const SizedBox(
@@ -265,43 +234,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       height: 24,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                       ),
                                     )
-                                  : const Text(
-                                      'Sign In',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                  : const Text('Register', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             ),
                           ),
                           const SizedBox(height: 16),
                           TextButton(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                            onPressed: () => Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(builder: (_) => const LoginScreen()),
                             ),
-                            child: const Text('Don\'t have an account? Register'),
+                            child: const Text('Already have an account? Sign In'),
                           ),
                         ],
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
                 FutureBuilder<PackageInfo>(
                   future: PackageInfo.fromPlatform(),
                   builder: (context, snapshot) {
                     if (snapshot.hasData) {
-                      final info = snapshot.data!;
                       return Text(
-                        'v${info.version}',
+                        'v${snapshot.data!.version}',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 12,
                           color: theme.colorScheme.onSurface.withOpacity(0.5),
-                          fontFamily: 'monospace',
                         ),
                       );
                     }

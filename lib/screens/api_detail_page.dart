@@ -396,7 +396,7 @@ class _ApiDetailPageState extends ConsumerState<ApiDetailPage> {
                       Clipboard.setData(ClipboardData(text: content));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('cURL copied to clipboard'),
+                          content: Center(child: Text('cURL copied to clipboard', style: const TextStyle(color: Colors.white))),
                           duration: Duration(seconds: 2),
                           behavior: SnackBarBehavior.floating,
                         ),

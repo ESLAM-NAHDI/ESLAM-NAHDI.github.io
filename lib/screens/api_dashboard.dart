@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:pluto_grid/pluto_grid.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../data/api_data.dart';
 import '../models/api_info.dart';
 import '../providers/app_providers.dart';
@@ -455,7 +456,7 @@ class _ApiDashboardState extends ConsumerState<ApiDashboard> {
                           Clipboard.setData(ClipboardData(text: api.curl ?? ''));
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('cURL copied to clipboard'),
+                              content: Center(child: Text('cURL copied to clipboard', style: const TextStyle(color: Colors.white))),
                               duration: Duration(seconds: 2),
                               behavior: SnackBarBehavior.floating,
                             ),
@@ -578,13 +579,34 @@ class _ApiDashboardState extends ConsumerState<ApiDashboard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Select Page',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Select Page',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        FutureBuilder<PackageInfo>(
+                          future: PackageInfo.fromPlatform(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasData) {
+                              return Text(
+                                'v${snapshot.data!.version}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white.withOpacity(0.6),
+                                  fontFamily: 'monospace',
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     _isLoadingPages

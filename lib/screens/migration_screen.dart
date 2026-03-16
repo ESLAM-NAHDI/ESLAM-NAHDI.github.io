@@ -47,7 +47,7 @@ class _MigrationScreenState extends ConsumerState<MigrationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Migration completed! Data will refresh automatically.'),
+            content: Center(child: Text('Migration completed! Data will refresh automatically.', style: const TextStyle(color: Colors.white))),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
@@ -63,7 +63,7 @@ class _MigrationScreenState extends ConsumerState<MigrationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Migration failed: $e'),
+            content: Center(child: Text('Migration failed: $e', style: const TextStyle(color: Colors.white))),
             backgroundColor: Colors.red,
           ),
         );
@@ -95,7 +95,7 @@ class _MigrationScreenState extends ConsumerState<MigrationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Screens migrated successfully! Sidebar will update automatically.'),
+            content: Center(child: Text('Screens migrated successfully! Sidebar will update automatically.', style: const TextStyle(color: Colors.white))),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
@@ -111,7 +111,7 @@ class _MigrationScreenState extends ConsumerState<MigrationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Migration failed: $e'),
+            content: Center(child: Text('Migration failed: $e', style: const TextStyle(color: Colors.white))),
             backgroundColor: Colors.red,
           ),
         );
@@ -143,7 +143,7 @@ class _MigrationScreenState extends ConsumerState<MigrationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Pages migrated successfully! Dropdown will update automatically.'),
+            content: Center(child: Text('Pages migrated successfully! Dropdown will update automatically.', style: const TextStyle(color: Colors.white))),
             backgroundColor: Colors.green,
             duration: Duration(seconds: 3),
           ),
@@ -159,7 +159,7 @@ class _MigrationScreenState extends ConsumerState<MigrationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Migration failed: $e'),
+            content: Center(child: Text('Migration failed: $e', style: const TextStyle(color: Colors.white))),
             backgroundColor: Colors.red,
           ),
         );

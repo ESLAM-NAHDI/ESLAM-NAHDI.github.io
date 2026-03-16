@@ -151,7 +151,7 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
   Future<void> _sendRequest() async {
     if (_urlController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a URL')),
+        const SnackBar(content: Center(child: Text('Please enter a URL', style: TextStyle(color: Colors.white)))),
       );
       return;
     }
@@ -266,8 +266,8 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
           // Try multiple proxy services for GET requests
           requestUrl = 'https://api.allorigins.win/raw?url=$encodedUrl';
         } else {
-          // For POST/PUT/PATCH/DELETE: use cors.lol (works in production, unlike corsproxy.io)
-          requestUrl = 'https://api.cors.lol/?url=$encodedUrl';
+          // For POST/PUT/PATCH/DELETE: corsproxy forwards method+body; cors.lol often returns 405
+          requestUrl = 'https://corsproxy-8uo5.onrender.com/?url=$encodedUrl';
         }
         
         // Debug: Log that we're using proxy
@@ -291,8 +291,9 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
             'https://api.allorigins.win/get?url=$encodedUrl',
           ];
         } else {
-          // For POST/PUT/DELETE: only cors.lol supports POST with body; allorigins does not
+          // For POST/PUT/DELETE: corsproxy forwards method+body; cors.lol often returns 405
           proxyAttempts = [
+            'https://corsproxy-8uo5.onrender.com/?url=$encodedUrl',
             'https://api.cors.lol/?url=$encodedUrl',
           ];
         }
@@ -513,7 +514,7 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
           if (tokensSaved && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Login tokens (access_token & id_token) saved! You can now use them for other requests.'),
+                content: Center(child: Text('Login tokens (access_token & id_token) saved! You can now use them for other requests.', style: const TextStyle(color: Colors.white))),
                 backgroundColor: Color(0xFF10B981),
                 duration: Duration(seconds: 3),
               ),
@@ -1079,7 +1080,7 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('cURL command imported successfully!'),
+          content: Center(child: Text('cURL command imported successfully!', style: const TextStyle(color: Colors.white))),
           backgroundColor: Color(0xFF10B981),
           duration: Duration(seconds: 2),
         ),
@@ -1087,7 +1088,7 @@ class _NahdiManScreenState extends ConsumerState<NahdiManScreen> with SingleTick
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error parsing cURL: $e'),
+          content: Center(child: Text('Error parsing cURL: $e', style: const TextStyle(color: Colors.white))),
           backgroundColor: Colors.red,
           duration: const Duration(seconds: 3),
         ),

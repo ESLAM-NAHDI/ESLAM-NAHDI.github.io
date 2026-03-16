@@ -2,6 +2,18 @@
 
 A new Flutter project.
 
+## Build & Deploy
+
+One command does everything (bump version → build web → push to GitHub Pages):
+
+```bash
+./build_web
+```
+
+Or: `bash build_web`
+
+Live at: https://ESLAM-NAHDI.github.io/
+
 ## Getting Started
 
 This project is a starting point for a Flutter application.

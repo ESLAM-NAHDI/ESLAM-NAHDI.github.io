@@ -3,9 +3,12 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'firebase_options.dart';
 import 'screens/api_dashboard.dart';
 import 'screens/nahdi_man_screen.dart';
+import 'screens/admin_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/developer_notes_screen.dart';
 import 'screens/migration_screen.dart';
@@ -13,8 +16,13 @@ import 'screens_documentation/presentation/widgets/screen_details_widget.dart';
 // Static data import commented out - using Firestore only
 // import 'screens_documentation/data/screens_data.dart';
 import 'screens_documentation/domain/models/screen_info_model.dart';
+import 'models/app_user.dart';
 import 'providers/app_providers.dart';
+import 'providers/auth_provider.dart';
+import 'providers/user_provider.dart';
+import 'services/user_service.dart';
 import 'providers/firestore_providers.dart';
+import 'screens/pending_approval_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -50,6 +58,60 @@ void main() async {
   );
 }
 
+/// Shows LoginScreen, PendingApprovalScreen, or MainScreen based on auth and approval
+class AuthWrapper extends ConsumerWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+
+    return authState.when(
+      data: (user) {
+        if (user == null || !user.emailVerified) {
+          return const LoginScreen();
+        }
+        return _ApprovalGate(email: user.email ?? '');
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const LoginScreen(),
+    );
+  }
+}
+
+class _ApprovalGate extends ConsumerWidget {
+  final String email;
+
+  const _ApprovalGate({required this.email});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appUserAsync = ref.watch(currentAppUserProvider);
+
+    return appUserAsync.when(
+      data: (appUser) {
+        if (appUser == null) return const LoginScreen();
+        if (appUser.isBlocked) {
+          Future.microtask(() async {
+            await FirebaseAuth.instance.signOut();
+          });
+          return const LoginScreen();
+        }
+        if (appUser.isPending) {
+          return PendingApprovalScreen(email: email);
+        }
+        return const MainScreen();
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const LoginScreen(),
+    );
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -71,7 +133,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const LoginScreen(),
+      home: const AuthWrapper(),
     );
   }
 }
@@ -87,23 +149,28 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isPagesExpanded = false;
 
-  final List<Widget> _screens = [
-    const ApiDashboard(),
-    const NahdiManScreen(),
-  ];
+  List<Widget> _buildScreens(AppUser user) {
+    final list = <Widget>[];
+    if (user.hasPermission(PermissionKeys.apiDashboard)) list.add(const ApiDashboard());
+    if (user.hasPermission(PermissionKeys.nahdiMan)) list.add(const NahdiManScreen());
+    if (user.hasPermission(PermissionKeys.admin)) list.add(const AdminScreen());
+    return list.isEmpty ? [const ApiDashboard()] : list;
+  }
 
-  final List<Map<String, dynamic>> _menuItems = [
-    {
-      'title': 'API Dashboard',
-      'icon': Icons.dashboard,
-      'index': 0,
-    },
-    {
-      'title': 'Nahdi Man',
-      'icon': Icons.api,
-      'index': 1,
-    },
-  ];
+  List<Map<String, dynamic>> _buildMenuItems(AppUser user) {
+    final list = <Map<String, dynamic>>[];
+    int idx = 0;
+    if (user.hasPermission(PermissionKeys.apiDashboard)) {
+      list.add({'title': 'API Dashboard', 'icon': Icons.dashboard, 'index': idx++});
+    }
+    if (user.hasPermission(PermissionKeys.nahdiMan)) {
+      list.add({'title': 'Nahdi Man', 'icon': Icons.api, 'index': idx++});
+    }
+    if (user.hasPermission(PermissionKeys.admin)) {
+      list.add({'title': 'Admin', 'icon': Icons.admin_panel_settings, 'index': idx++});
+    }
+    return list.isEmpty ? [{'title': 'API Dashboard', 'icon': Icons.dashboard, 'index': 0}] : list;
+  }
 
   void _onMenuItemSelected(int index) {
     ref.read(currentScreenIndexProvider.notifier).state = index;
@@ -130,12 +197,23 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final appUserAsync = ref.watch(currentAppUserProvider);
     final currentIndex = ref.watch(currentScreenIndexProvider);
 
-    return Scaffold(
-      key: _scaffoldKey,
-      body: _screens[currentIndex],
-      drawer: Drawer(
+    return appUserAsync.when(
+      data: (appUser) {
+        final user = appUser ?? AppUser(uid: '', email: '', status: 'approved', permissions: {for (final k in PermissionKeys.all) k: true});
+        final screens = _buildScreens(user);
+        final menuItems = _buildMenuItems(user);
+        final safeIndex = currentIndex.clamp(0, screens.length - 1);
+        if (safeIndex != currentIndex) {
+          Future.microtask(() => ref.read(currentScreenIndexProvider.notifier).state = safeIndex);
+        }
+
+        return Scaffold(
+          key: _scaffoldKey,
+          body: screens[safeIndex],
+          drawer: Drawer(
         backgroundColor: theme.colorScheme.surface,
         child: Column(
           children: [
@@ -187,6 +265,23 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                           color: theme.colorScheme.onSurface.withOpacity(0.7),
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      FutureBuilder<PackageInfo>(
+                        future: PackageInfo.fromPlatform(),
+                        builder: (context, snapshot) {
+                          final version = snapshot.hasData
+                              ? 'v${snapshot.data!.version}+${snapshot.data!.buildNumber}'
+                              : '';
+                          return Text(
+                            version,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.onSurface.withOpacity(0.5),
+                              fontFamily: 'monospace',
+                            ),
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ],
@@ -199,8 +294,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
                   // Regular menu items
-                  ..._menuItems.map((item) {
-                    final isSelected = currentIndex == item['index'];
+                  ...menuItems.map((item) {
+                    final isSelected = safeIndex == item['index'];
                     return ListTile(
                       leading: Icon(
                         item['icon'] as IconData,
@@ -220,7 +315,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       ),
                       selected: isSelected,
                       selectedTileColor: theme.colorScheme.primary.withOpacity(0.1),
-                      onTap: () => _onMenuItemSelected(item['index'] as int),
+                      onTap: () => _onMenuItemSelected(menuItems.indexOf(item)),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
@@ -231,7 +326,10 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                     );
                   }),
                   
-                  // Pages expandable section
+                  // Pages expandable section (if user has any page permission)
+                  if (user.hasPermission(PermissionKeys.pages) ||
+                      user.hasPermission(PermissionKeys.developerNotes) ||
+                      user.hasPermission(PermissionKeys.migration))
                   ExpansionTile(
                     leading: Icon(
                       Icons.pages,
@@ -257,6 +355,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                     },
                     children: [
                       // Developer Notes
+                      if (user.hasPermission(PermissionKeys.developerNotes))
                       ListTile(
                         leading: const SizedBox(width: 40),
                         title: Row(
@@ -293,6 +392,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         ),
                       ),
                       // Firebase Migration
+                      if (user.hasPermission(PermissionKeys.migration))
                       ListTile(
                         leading: const SizedBox(width: 40),
                         title: Row(
@@ -328,7 +428,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                           vertical: 4,
                         ),
                       ),
-                      // Divider
+                      // Divider (only if we have screen docs below)
+                      if (user.hasPermission(PermissionKeys.pages))
                       Divider(
                         height: 1,
                         thickness: 1,
@@ -337,6 +438,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                         endIndent: 20,
                       ),
                       // Documentation Screens
+                      if (user.hasPermission(PermissionKeys.pages))
                       Builder(
                         builder: (context) {
                           // Watch screens provider - will auto-refresh when Firestore updates
@@ -550,19 +652,48 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   ),
                 ),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Icon(
-                    Icons.info_outline,
-                    size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      ),
+                      const SizedBox(width: 8),
+                      FutureBuilder<PackageInfo>(
+                        future: PackageInfo.fromPlatform(),
+                        builder: (context, snapshot) {
+                          final version = snapshot.hasData
+                              ? 'v${snapshot.data!.version}'
+                              : 'v2.0.0';
+                          return Text(
+                            version,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: theme.colorScheme.onSurface.withOpacity(0.5),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Version 1.0.0',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        _scaffoldKey.currentState?.closeDrawer();
+                        await FirebaseAuth.instance.signOut();
+                        if (!context.mounted) return;
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const LoginScreen()),
+                          (route) => false,
+                        );
+                      },
+                      icon: const Icon(Icons.logout, size: 18),
+                      label: const Text('Sign Out'),
                     ),
                   ),
                 ],
@@ -579,10 +710,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         title: Row(
           children: [
             Expanded(
-              child: Text(_menuItems[currentIndex]['title'] as String),
+              child: Text(menuItems.isNotEmpty && safeIndex < menuItems.length
+                  ? (menuItems[safeIndex]['title'] as String)
+                  : 'Dashboard'),
             ),
             // Screenshot toggle button (only show on API Dashboard)
-            if (currentIndex == 0)
+            if (safeIndex < menuItems.length && menuItems[safeIndex]['title'] == 'API Dashboard')
               Builder(
                 builder: (context) {
                   final showScreenshot = ref.watch(showScreenshotProvider);
@@ -603,6 +736,14 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           ],
         ),
         elevation: 0,
+      ),
+    );
+      },
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => const Scaffold(
+        body: Center(child: Text('Error loading user')),
       ),
     );
   }
